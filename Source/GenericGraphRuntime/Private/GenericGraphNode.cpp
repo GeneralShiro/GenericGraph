@@ -48,7 +48,7 @@ void UGenericGraphNode::SetNodeTitle(const FText& NewTitle)
 }
 
 bool UGenericGraphNode::CanCreateConnection(UGenericGraphNode* Other, FText& ErrorMessage)
-{	
+{
 	return true;
 }
 
@@ -80,11 +80,6 @@ bool UGenericGraphNode::CanCreateConnectionFrom(UGenericGraphNode* Other, int32 
 bool UGenericGraphNode::IsLeafNode() const
 {
 	return ChildrenNodes.Num() == 0;
-}
-
-UGenericGraph* UGenericGraphNode::GetGraph() const
-{
-	return Graph;
 }
 
 #undef LOCTEXT_NAMESPACE

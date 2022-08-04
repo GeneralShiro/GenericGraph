@@ -16,26 +16,26 @@ public:
 	virtual ~UGenericGraphEdge();
 
 	UPROPERTY(VisibleAnywhere, Category = "GenericGraphNode")
-	UGenericGraph* Graph;
+		UGenericGraph* OwnerGraph;
 
 	UPROPERTY(BlueprintReadOnly, Category = "GenericGraphEdge")
-	UGenericGraphNode* StartNode;
+		UGenericGraphNode* StartNode;
 
 	UPROPERTY(BlueprintReadOnly, Category = "GenericGraphEdge")
-	UGenericGraphNode* EndNode;
+		UGenericGraphNode* EndNode;
 
 	UFUNCTION(BlueprintPure, Category = "GenericGraphEdge")
-	UGenericGraph* GetGraph() const;
+		UGenericGraph* GetGraph() const { return OwnerGraph; }
 
 #if WITH_EDITORONLY_DATA
 	UPROPERTY(EditDefaultsOnly, Category = "GenericGraphNode_Editor")
-	bool bShouldDrawTitle = false;
+		bool bShouldDrawTitle = false;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GenericGraphNode_Editor")
-	FText NodeTitle;
+		FText NodeTitle;
 
 	UPROPERTY(EditDefaultsOnly, Category = "GenericGraphEdge")
-	FLinearColor EdgeColour = FLinearColor(0.9f, 0.9f, 0.9f, 1.0f);
+		FLinearColor EdgeColour = FLinearColor(0.9f, 0.9f, 0.9f, 1.0f);
 #endif
 
 #if WITH_EDITOR
@@ -44,5 +44,5 @@ public:
 
 	virtual void SetNodeTitle(const FText& NewTitle);
 #endif
-	
+
 };

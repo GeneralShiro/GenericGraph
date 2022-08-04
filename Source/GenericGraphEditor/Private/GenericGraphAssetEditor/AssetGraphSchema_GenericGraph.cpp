@@ -217,7 +217,7 @@ void UAssetGraphSchema_GenericGraph::GetGraphContextActions(FGraphContextMenuBui
 		TSharedPtr<FAssetSchemaAction_GenericGraph_NewNode> NewNodeAction(new FAssetSchemaAction_GenericGraph_NewNode(LOCTEXT("GenericGraphNodeAction", "Generic Graph Node"), Desc, AddToolTip, 0));
 		NewNodeAction->NodeTemplate = NewObject<UEdNode_GenericGraphNode>(ContextMenuBuilder.OwnerOfTemporaries);
 		NewNodeAction->NodeTemplate->GenericGraphNode = NewObject<UGenericGraphNode>(NewNodeAction->NodeTemplate, Graph->NodeType);
-		NewNodeAction->NodeTemplate->GenericGraphNode->Graph = Graph;
+		NewNodeAction->NodeTemplate->GenericGraphNode->OwnerGraph = Graph;
 		ContextMenuBuilder.AddAction(NewNodeAction);
 
 		Visited.Add(Graph->NodeType);
@@ -247,7 +247,7 @@ void UAssetGraphSchema_GenericGraph::GetGraphContextActions(FGraphContextMenuBui
 			TSharedPtr<FAssetSchemaAction_GenericGraph_NewNode> Action(new FAssetSchemaAction_GenericGraph_NewNode(LOCTEXT("GenericGraphNodeAction", "Generic Graph Node"), Desc, AddToolTip, 0));
 			Action->NodeTemplate = NewObject<UEdNode_GenericGraphNode>(ContextMenuBuilder.OwnerOfTemporaries);
 			Action->NodeTemplate->GenericGraphNode = NewObject<UGenericGraphNode>(Action->NodeTemplate, NodeType);
-			Action->NodeTemplate->GenericGraphNode->Graph = Graph;
+			Action->NodeTemplate->GenericGraphNode->OwnerGraph = Graph;
 			ContextMenuBuilder.AddAction(Action);
 
 			Visited.Add(NodeType);

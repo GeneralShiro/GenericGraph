@@ -1,4 +1,6 @@
 #include "GenericGraphAssetEditor/EdNode_GenericGraphEdge.h"
+
+#include "EdGraphUtilities.h"
 #include "GenericGraphEdge.h"
 #include "GenericGraphAssetEditor/EdNode_GenericGraphNode.h"
 
@@ -53,6 +55,34 @@ void UEdNode_GenericGraphEdge::PrepareForCopying()
 	GenericGraphEdge->Rename(nullptr, this, REN_DontCreateRedirectors | REN_DoNotDirty);
 }
 
+void UEdNode_GenericGraphEdge::DestroyNode()
+{
+	// BoundGraph may be shared with another graph, if so, don't remove it here
+	TObjectPtr<UEdGraph> GraphToRemove = GetBoundGraph();
+
+	BoundGraph = NULL;
+	Super::DestroyNode();
+
+	// TODO: how to rewrite this to fit this plugin?
+	/*if (GraphToRemove)
+	{
+		UBlueprint* Blueprint = FBlueprintEditorUtils::FindBlueprintForNodeChecked(this);
+		FBlueprintEditorUtils::RemoveGraph(Blueprint, GraphToRemove, EGraphRemoveFlags::Recompile);
+	}*/
+}
+
+UObject* UEdNode_GenericGraphEdge::GetJumpTargetForDoubleClick() const
+{
+	return BoundGraph;
+}
+
+TArray<UEdGraph*> UEdNode_GenericGraphEdge::GetSubGraphs() const
+{
+	TArray<UEdGraph*> SubGraphs;
+	SubGraphs.Add(BoundGraph);
+	return SubGraphs;
+}
+
 void UEdNode_GenericGraphEdge::CreateConnections(UEdNode_GenericGraphNode* Start, UEdNode_GenericGraphNode* End)
 {
 	Pins[0]->Modify();
@@ -90,6 +120,29 @@ UEdNode_GenericGraphNode* UEdNode_GenericGraphEdge::GetEndNode()
 	else
 	{
 		return nullptr;
+	}
+}
+
+void UEdNode_GenericGraphEdge::CreateBoundGraph()
+{
+	// Create a new animation graph
+	check(BoundGraph == NULL);
+	//BoundGraph = FBlueprintEditorUtils::CreateNewGraph(this, NAME_None, UAnimationTransitionGraph::StaticClass(), UAnimationTransitionSchema::StaticClass());
+	check(BoundGraph);
+
+	// Find an interesting name
+	FEdGraphUtilities::RenameGraphToNameOrCloseToName(BoundGraph, TEXT("Transition"));
+
+	// Initialize the anim graph
+	const UEdGraphSchema* Schema = BoundGraph->GetSchema();
+	Schema->CreateDefaultNodesForGraph(*BoundGraph);
+
+	// Add the new graph as a child of our parent graph
+	UEdGraph* ParentGraph = GetGraph();
+
+	if(ParentGraph->SubGraphs.Find(BoundGraph) == INDEX_NONE)
+	{
+		ParentGraph->SubGraphs.Add(BoundGraph);
 	}
 }
 

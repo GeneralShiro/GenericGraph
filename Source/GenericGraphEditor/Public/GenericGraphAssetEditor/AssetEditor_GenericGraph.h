@@ -3,6 +3,8 @@
 #include "CoreMinimal.h"
 #include "Settings_GenericGraphEditor.h"
 #include "GenericGraph.h"
+#include "WorkflowOrientedApp/WorkflowCentricApplication.h"
+#include "WorkflowOrientedApp/WorkflowTabManager.h"
 
 #if ENGINE_MAJOR_VERSION == 5
 #include "UObject/ObjectSaveContext.h"
@@ -10,7 +12,7 @@
 
 class FGGAssetEditorToolbar;
 
-class GENERICGRAPHEDITOR_API FAssetEditor_GenericGraph : public FAssetEditorToolkit, public FNotifyHook, public FGCObject
+class GENERICGRAPHEDITOR_API FAssetEditor_GenericGraph : public FWorkflowCentricApplication, public FNotifyHook, public FGCObject
 {
 public:
 	FAssetEditor_GenericGraph();
@@ -39,7 +41,6 @@ public:
 	TSharedPtr<class FAssetEditorToolbar_GenericGraph> GetToolbarBuilder() { return ToolbarBuilder; }
 	void RegisterToolbarTab(const TSharedRef<class FTabManager>& TabManager);
 
-
 	// FSerializableObject interface
 	virtual void AddReferencedObjects(FReferenceCollector& Collector) override;
 	// End of FSerializableObject interface
@@ -55,6 +56,16 @@ public:
 
 	UGenericGraphEditorSettings* GetSettings() const;
 
+	TSharedPtr<FDocumentTracker> DocumentManager;
+
+	TSharedPtr<SDockTab> OpenDocument(const UObject* DocumentID, FDocumentTracker::EOpenDocumentCause Cause);
+
+	/** Finds the tab associated with the specified asset, and closes if it is open */
+	void CloseDocumentTab(const UObject* DocumentID);
+
+	// Finds any open tabs containing the specified document and adds them to the specified array; returns true if at least one is found
+	bool FindOpenTabsContainingDocument(const UObject* DocumentID, /*inout*/ TArray< TSharedPtr<SDockTab> >& Results);
+
 protected:
 	TSharedRef<SDockTab> SpawnTab_Viewport(const FSpawnTabArgs& Args);
 	TSharedRef<SDockTab> SpawnTab_Details(const FSpawnTabArgs& Args);
@@ -62,7 +73,6 @@ protected:
 
 	void CreateInternalWidgets();
 	TSharedRef<SGraphEditor> CreateViewportWidget();
-
 
 	void BindCommands();
 
@@ -101,11 +111,15 @@ protected:
 	void OnRenameNode();
 	bool CanRenameNodes() const;
 
+	// Navigating into/out of graphs
+	void NavigateToParentGraph();
+	bool CanNavigateToParentGraph() const;
+	void NavigateToChildGraph();
+	bool CanNavigateToChildGraph() const;
+
 	//////////////////////////////////////////////////////////////////////////
 	// graph editor event
 	void OnSelectedNodesChanged(const TSet<class UObject*>& NewSelection);
-
-	void OnNodeDoubleClicked(UEdGraphNode* Node);
 
 	void OnFinishedChangingProperties(const FPropertyChangedEvent& PropertyChangedEvent);
 
@@ -116,7 +130,7 @@ protected:
 #endif // #else // #if ENGINE_MAJOR_VERSION < 5
 
 protected:
-	UGenericGraphEditorSettings* GenricGraphEditorSettings;
+	UGenericGraphEditorSettings* GenericGraphEditorSettings;
 
 	UGenericGraph* EditingGraph;
 
@@ -132,6 +146,11 @@ protected:
 
 	/** The command list for this editor */
 	TSharedPtr<FUICommandList> GraphEditorCommands;
+
+private:
+
+	/** Helper function to navigate the current tab */
+	void NavigateTab(FDocumentTracker::EOpenDocumentCause InCause);
 };
 
 

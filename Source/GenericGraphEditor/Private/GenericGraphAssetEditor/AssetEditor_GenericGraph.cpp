@@ -13,11 +13,11 @@
 #include "Editor/UnrealEd/Public/Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "EdGraphUtilities.h"
-#include "GenericGraphAssetEditor/EdGraph_GenericGraph.h"
 #include "GenericGraphAssetEditor/EdNode_GenericGraphNode.h"
 #include "GenericGraphAssetEditor/EdNode_GenericGraphEdge.h"
 #include "AutoLayout/TreeLayoutStrategy.h"
 #include "AutoLayout/ForceDirectedLayoutStrategy.h"
+#include "WorkflowOrientedApp/WorkflowUObjectDocuments.h"
 
 #define LOCTEXT_NAMESPACE "AssetEditor_GenericGraph"
 
@@ -43,7 +43,9 @@ FAssetEditor_GenericGraph::FAssetEditor_GenericGraph()
 {
 	EditingGraph = nullptr;
 
-	GenricGraphEditorSettings = NewObject<UGenericGraphEditorSettings>(UGenericGraphEditorSettings::StaticClass());
+	GenericGraphEditorSettings = NewObject<UGenericGraphEditorSettings>(UGenericGraphEditorSettings::StaticClass());
+
+	DocumentManager = MakeShareable(new FDocumentTracker);
 
 #if ENGINE_MAJOR_VERSION < 5
 	OnPackageSavedDelegateHandle = UPackage::PackageSavedEvent.AddRaw(this, &FAssetEditor_GenericGraph::OnPackageSaved);
@@ -126,7 +128,10 @@ void FAssetEditor_GenericGraph::InitGenericGraphAssetEditor(const EToolkitMode::
 
 	const bool bCreateDefaultStandaloneMenu = true;
 	const bool bCreateDefaultToolbar = true;
-	FAssetEditorToolkit::InitAssetEditor(Mode, InitToolkitHost, GenericGraphEditorAppName, StandaloneDefaultLayout, bCreateDefaultStandaloneMenu, bCreateDefaultToolbar, EditingGraph, false);
+	InitAssetEditor(Mode, InitToolkitHost, GenericGraphEditorAppName, StandaloneDefaultLayout, bCreateDefaultStandaloneMenu, bCreateDefaultToolbar, EditingGraph, false);
+
+	TSharedPtr<FAssetEditor_GenericGraph> ThisPtr(SharedThis(this));
+	DocumentManager->Initialize(ThisPtr);
 
 	RegenerateMenusAndToolbars();
 }
@@ -221,7 +226,39 @@ void FAssetEditor_GenericGraph::AddReferencedObjects(FReferenceCollector& Collec
 
 UGenericGraphEditorSettings* FAssetEditor_GenericGraph::GetSettings() const
 {
-	return GenricGraphEditorSettings;
+	return GenericGraphEditorSettings;
+}
+
+TSharedPtr<SDockTab> FAssetEditor_GenericGraph::OpenDocument(const UObject* DocumentID,
+	FDocumentTracker::EOpenDocumentCause Cause)
+{
+	TSharedRef<FTabPayload_UObject> Payload = FTabPayload_UObject::Make(DocumentID);
+	return DocumentManager->OpenDocument(Payload, Cause);
+}
+
+void FAssetEditor_GenericGraph::NavigateTab(FDocumentTracker::EOpenDocumentCause InCause)
+{
+	OpenDocument(nullptr, InCause);
+}
+
+void FAssetEditor_GenericGraph::CloseDocumentTab(const UObject* DocumentID)
+{
+	TSharedRef<FTabPayload_UObject> Payload = FTabPayload_UObject::Make(DocumentID);
+	DocumentManager->CloseTab(Payload);
+}
+
+// Finds any open tabs containing the specified document and adds them to the specified array; returns true if at least one is found
+bool FAssetEditor_GenericGraph::FindOpenTabsContainingDocument(const UObject* DocumentID,
+	TArray<TSharedPtr<SDockTab>>& Results)
+{
+	int32 StartingCount = Results.Num();
+
+	TSharedRef<FTabPayload_UObject> Payload = FTabPayload_UObject::Make(DocumentID);
+
+	DocumentManager->FindMatchingTabs(Payload, /*inout*/ Results);
+
+	// Did we add anything new?
+	return (StartingCount != Results.Num());
 }
 
 TSharedRef<SDockTab> FAssetEditor_GenericGraph::SpawnTab_Viewport(const FSpawnTabArgs& Args)
@@ -281,7 +318,7 @@ void FAssetEditor_GenericGraph::CreateInternalWidgets()
 	PropertyWidget->OnFinishedChangingProperties().AddSP(this, &FAssetEditor_GenericGraph::OnFinishedChangingProperties);
 
 	EditorSettingsWidget = PropertyModule.CreateDetailView(Args);
-	EditorSettingsWidget->SetObject(GenricGraphEditorSettings);
+	EditorSettingsWidget->SetObject(GenericGraphEditorSettings);
 }
 
 TSharedRef<SGraphEditor> FAssetEditor_GenericGraph::CreateViewportWidget()
@@ -293,7 +330,7 @@ TSharedRef<SGraphEditor> FAssetEditor_GenericGraph::CreateViewportWidget()
 
 	SGraphEditor::FGraphEditorEvents InEvents;
 	InEvents.OnSelectionChanged = SGraphEditor::FOnSelectionChanged::CreateSP(this, &FAssetEditor_GenericGraph::OnSelectedNodesChanged);
-	InEvents.OnNodeDoubleClicked = FSingleNodeEvent::CreateSP(this, &FAssetEditor_GenericGraph::OnNodeDoubleClicked);
+	//InEvents.OnNodeDoubleClicked = FSingleNodeEvent::CreateSP(this, &FAssetEditor_GenericGraph::OnNodeDoubleClicked);
 
 	return SNew(SGraphEditor)
 		.AdditionalCommands(GraphEditorCommands)
@@ -315,6 +352,22 @@ void FAssetEditor_GenericGraph::BindCommands()
 	ToolkitCommands->MapAction(FEditorCommands_GenericGraph::Get().AutoArrange,
 		FExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::AutoArrange),
 		FCanExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::CanAutoArrange)
+	);
+
+	// View commands
+	ToolkitCommands->MapAction(FEditorCommands_GenericGraph::Get().NavigateToParent,
+		FExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::NavigateToParentGraph),
+		FCanExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::CanNavigateToParentGraph)
+	);
+
+	ToolkitCommands->MapAction(FEditorCommands_GenericGraph::Get().NavigateToParentBackspace,
+		FExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::NavigateToParentGraph),
+		FCanExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::CanNavigateToParentGraph)
+	);
+
+	ToolkitCommands->MapAction(FEditorCommands_GenericGraph::Get().NavigateToChild,
+		FExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::NavigateToChildGraph),
+		FCanExecuteAction::CreateSP(this, &FAssetEditor_GenericGraph::CanNavigateToChildGraph)
 	);
 }
 
@@ -706,7 +759,7 @@ void FAssetEditor_GenericGraph::AutoArrange()
 	EdGraph->Modify();
 
 	UAutoLayoutStrategy* LayoutStrategy = nullptr;
-	switch (GenricGraphEditorSettings->AutoLayoutStrategy)
+	switch (GenericGraphEditorSettings->AutoLayoutStrategy)
 	{
 	case EAutoLayoutStrategy::Tree:
 		LayoutStrategy = NewObject<UAutoLayoutStrategy>(EdGraph, UTreeLayoutStrategy::StaticClass());
@@ -720,7 +773,7 @@ void FAssetEditor_GenericGraph::AutoArrange()
 
 	if (LayoutStrategy != nullptr)
 	{
-		LayoutStrategy->Settings = GenricGraphEditorSettings;
+		LayoutStrategy->Settings = GenericGraphEditorSettings;
 		LayoutStrategy->Layout(EdGraph);
 		LayoutStrategy->ConditionalBeginDestroy();
 	}
@@ -761,7 +814,155 @@ bool FAssetEditor_GenericGraph::CanRenameNodes() const
 	UGenericGraph* Graph = EdGraph->GetGenericGraph();
 	check(Graph != nullptr)
 
-	return Graph->bCanRenameNode && GetSelectedNodes().Num() == 1;
+		return Graph->bCanRenameNode && GetSelectedNodes().Num() == 1;
+}
+
+void FAssetEditor_GenericGraph::NavigateToParentGraph()
+{
+	TSharedPtr<SGraphEditor> FocusedGraphEdPtr = GetCurrGraphEditor();
+
+	if (FocusedGraphEdPtr.IsValid())
+	{
+		if (UEdGraph* ParentGraph = UEdGraph::GetOuterGraph(FocusedGraphEdPtr->GetCurrentGraph()))
+		{
+			// Navigating into things should re-use the current tab when it makes sense
+			FDocumentTracker::EOpenDocumentCause OpenMode = FDocumentTracker::OpenNewDocument;
+			if ((ParentGraph->GetSchema()->GetGraphType(ParentGraph) == GT_Ubergraph) || Cast<UEdGraph>(ParentGraph->GetOuter()))
+			{
+				// Ubergraphs directly reuse the current graph
+				OpenMode = FDocumentTracker::NavigatingCurrentDocument;
+			}
+			else
+			{
+				// Walk up the outer chain to see if any tabs have a parent of this document open for edit, and if so
+				// we should reuse that one and drill in deeper instead
+				for (UObject* WalkPtr = const_cast<UEdGraph*>(ParentGraph); WalkPtr != nullptr; WalkPtr = WalkPtr->GetOuter())
+				{
+					TArray< TSharedPtr<SDockTab> > TabResults;
+					if (FindOpenTabsContainingDocument(WalkPtr, /*out*/ TabResults))
+					{
+						// See if the parent was active
+						bool bIsActive = false;
+						for (TSharedPtr<SDockTab> Tab : TabResults)
+						{
+							if (Tab->IsActive())
+							{
+								bIsActive = true;
+								break;
+							}
+						}
+
+						if (bIsActive)
+						{
+							OpenMode = FDocumentTracker::NavigatingCurrentDocument;
+							break;
+						}
+					}
+				}
+			}
+
+			// Force it to open in a new document if shift is pressed
+			const bool bIsShiftPressed = FSlateApplication::Get().GetModifierKeys().IsShiftDown();
+			if (bIsShiftPressed)
+			{
+				OpenMode = FDocumentTracker::ForceOpenNewDocument;
+			}
+
+			// Open the document
+			OpenDocument(ParentGraph, OpenMode);
+		}
+	}
+}
+
+bool FAssetEditor_GenericGraph::CanNavigateToParentGraph() const
+{
+	TSharedPtr<SGraphEditor> FocusedGraphEdPtr = GetCurrGraphEditor();
+	return FocusedGraphEdPtr.IsValid() && UEdGraph::GetOuterGraph(FocusedGraphEdPtr->GetCurrentGraph());
+}
+
+void FAssetEditor_GenericGraph::NavigateToChildGraph()
+{
+	TSharedPtr<SGraphEditor> FocusedGraphEdPtr = GetCurrGraphEditor();
+
+	if (FocusedGraphEdPtr.IsValid())
+	{
+		UEdGraph* CurrentGraph = FocusedGraphEdPtr->GetCurrentGraph();
+
+		if (CurrentGraph->Nodes.Num() > 0)
+		{
+			// Display a child jump list
+			FMenuBuilder MenuBuilder(true, nullptr);
+			MenuBuilder.BeginSection("NavigateToGraph", LOCTEXT("ChildGraphPickerDesc", "Navigate to graph"));
+
+			TArray<TObjectPtr<UEdGraphNode>> SortedGraphNodes = CurrentGraph->Nodes;
+			SortedGraphNodes.Sort([](UEdGraphNode& A, UEdGraphNode& B) {
+				FText AName = A.GetNodeTitle(ENodeTitleType::ListView);
+				FText BName = B.GetNodeTitle(ENodeTitleType::ListView);
+				return AName.CompareToCaseIgnored(BName) < 0; });
+
+			TObjectPtr<UEdGraphNode> SingleNode;
+			int32 NumEntries = 0;
+
+			for (TObjectPtr<UEdGraphNode> Node : SortedGraphNodes)
+			{
+				// Just calling CanJumpToDefinition isn't enough as it returns true for functions (resulting in a jump
+				// to code, which isn't desired).
+				UObject* TargetObject = Node->GetJumpTargetForDoubleClick();
+				if (TargetObject && Node->CanJumpToDefinition())
+				{
+					++NumEntries;
+					SingleNode = Node;
+					MenuBuilder.AddMenuEntry(
+						Node->GetNodeTitle(ENodeTitleType::ListView),
+						LOCTEXT("ChildGraphPickerTooltip", "Pick the graph to enter"),
+						FSlateIcon(),
+						FUIAction(
+							FExecuteAction::CreateLambda(
+								[this, Node]()
+								{
+									if (Node->CanJumpToDefinition())
+									{
+										Node->JumpToDefinition();
+									}
+								}),
+							FCanExecuteAction()));
+				}
+			}
+			MenuBuilder.EndSection();
+
+			if (NumEntries > 0)
+			{
+				// If there is only one entry we could just jump straight to it. However, sometimes that can be a little
+				// disorientating if it was not obvious to the user exactly what the targets might be.
+				FSlateApplication::Get().PushMenu(
+					GetToolkitHost()->GetParentWidget(),
+					FWidgetPath(),
+					MenuBuilder.MakeWidget(),
+					FSlateApplication::Get().GetCursorPos(), // summon location
+					FPopupTransitionEffect(FPopupTransitionEffect::TypeInPopup)
+				);
+			}
+		}
+	}
+}
+
+bool FAssetEditor_GenericGraph::CanNavigateToChildGraph() const
+{
+	TSharedPtr<SGraphEditor> FocusedGraphEdPtr = GetCurrGraphEditor();
+
+	if (FocusedGraphEdPtr.IsValid())
+	{
+		UEdGraph* CurrentGraph = FocusedGraphEdPtr->GetCurrentGraph();
+		for (TObjectPtr<UEdGraphNode> Node : CurrentGraph->Nodes)
+		{
+			UObject* TargetObject = Node->GetJumpTargetForDoubleClick();
+			if (TargetObject && Node->CanJumpToDefinition())
+			{
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 void FAssetEditor_GenericGraph::OnSelectedNodesChanged(const TSet<class UObject*>& NewSelection)
@@ -773,7 +974,7 @@ void FAssetEditor_GenericGraph::OnSelectedNodesChanged(const TSet<class UObject*
 		Selection.Add(SelectionEntry);
 	}
 
-	if (Selection.Num() == 0) 
+	if (Selection.Num() == 0)
 	{
 		PropertyWidget->SetObject(EditingGraph);
 
@@ -782,11 +983,6 @@ void FAssetEditor_GenericGraph::OnSelectedNodesChanged(const TSet<class UObject*
 	{
 		PropertyWidget->SetObjects(Selection);
 	}
-}
-
-void FAssetEditor_GenericGraph::OnNodeDoubleClicked(UEdGraphNode* Node)
-{
-	
 }
 
 void FAssetEditor_GenericGraph::OnFinishedChangingProperties(const FPropertyChangedEvent& PropertyChangedEvent)
@@ -809,7 +1005,7 @@ void FAssetEditor_GenericGraph::OnPackageSavedWithContext(const FString& Package
 }
 #endif // #else // #if ENGINE_MAJOR_VERSION < 5
 
-void FAssetEditor_GenericGraph::RegisterToolbarTab(const TSharedRef<class FTabManager>& InTabManager) 
+void FAssetEditor_GenericGraph::RegisterToolbarTab(const TSharedRef<class FTabManager>& InTabManager)
 {
 	FAssetEditorToolkit::RegisterTabSpawners(InTabManager);
 }

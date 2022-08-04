@@ -10,11 +10,6 @@ UGenericGraphEdge::~UGenericGraphEdge()
 
 }
 
-UGenericGraph* UGenericGraphEdge::GetGraph() const
-{
-	return Graph;
-}
-
 #if WITH_EDITOR
 void UGenericGraphEdge::SetNodeTitle(const FText& NewTitle)
 {

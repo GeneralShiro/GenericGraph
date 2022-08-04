@@ -89,14 +89,14 @@ int UGenericGraph::GetLevelNum() const
 
 void UGenericGraph::GetNodesByLevel(int Level, TArray<UGenericGraphNode*>& Nodes)
 {
-	int CurrLEvel = 0;
+	int CurrLevel = 0;
 	TArray<UGenericGraphNode*> NextLevelNodes;
 
 	Nodes = RootNodes;
 
 	while (Nodes.Num() != 0)
 	{
-		if (CurrLEvel == Level)
+		if (CurrLevel == Level)
 			break;
 
 		for (int i = 0; i < Nodes.Num(); ++i)
@@ -112,7 +112,7 @@ void UGenericGraph::GetNodesByLevel(int Level, TArray<UGenericGraphNode*>& Nodes
 
 		Nodes = NextLevelNodes;
 		NextLevelNodes.Reset();
-		++CurrLEvel;
+		++CurrLevel;
 	}
 }
 

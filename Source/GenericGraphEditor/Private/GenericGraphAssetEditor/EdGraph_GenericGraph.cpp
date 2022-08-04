@@ -85,7 +85,7 @@ void UEdGraph_GenericGraph::RebuildGenericGraph()
 
 			EdgeMap.Add(Edge, EdgeNode);
 
-			Edge->Graph = Graph;
+			Edge->OwnerGraph = Graph;
 			Edge->Rename(nullptr, Graph, REN_DontCreateRedirectors | REN_DoNotDirty);
 			Edge->StartNode = StartNode->GenericGraphNode;
 			Edge->EndNode = EndNode->GenericGraphNode;
@@ -103,7 +103,7 @@ void UEdGraph_GenericGraph::RebuildGenericGraph()
 			SortNodes(Node);
 		}
 
-		Node->Graph = Graph;
+		Node->OwnerGraph = Graph;
 		Node->Rename(nullptr, Graph, REN_DontCreateRedirectors | REN_DoNotDirty);
 	}
 
