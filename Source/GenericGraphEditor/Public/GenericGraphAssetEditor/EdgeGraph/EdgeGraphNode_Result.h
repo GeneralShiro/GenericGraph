@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GenericGraphAssetEditor/EdgeGraphNode_Base.h"
+#include "EdgeGraphNode_Base.h"
 #include "EdgeGraphNode_Result.generated.h"
 
 /**

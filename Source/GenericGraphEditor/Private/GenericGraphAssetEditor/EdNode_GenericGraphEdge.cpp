@@ -1,6 +1,9 @@
 #include "GenericGraphAssetEditor/EdNode_GenericGraphEdge.h"
 
+#include "EdGraphSchema_GenericGraphEdge.h"
 #include "EdGraphUtilities.h"
+#include "EdGraph_GenericGraph.h"
+#include "EdGraph_GenericGraphEdge.h"
 #include "GenericGraphEdge.h"
 #include "GenericGraphAssetEditor/EdNode_GenericGraphNode.h"
 
@@ -52,7 +55,41 @@ void UEdNode_GenericGraphEdge::PinConnectionListChanged(UEdGraphPin* Pin)
 
 void UEdNode_GenericGraphEdge::PrepareForCopying()
 {
+	Super::PrepareForCopying();
+
 	GenericGraphEdge->Rename(nullptr, this, REN_DontCreateRedirectors | REN_DoNotDirty);
+	BoundGraph->Rename(nullptr, this, REN_DontCreateRedirectors | REN_DoNotDirty);
+}
+
+void UEdNode_GenericGraphEdge::PostPasteNode()
+{
+	if (BoundGraph == nullptr)
+	{
+		CreateBoundGraph();
+	}
+
+	for (UEdGraphNode* GraphNode : BoundGraph->Nodes)
+	{
+		GraphNode->CreateNewGuid();
+		GraphNode->PostPasteNode();
+		GraphNode->ReconstructNode();
+	}
+
+	Super::PostPasteNode();
+
+	for (UEdGraphPin* Pin : Pins)
+	{
+		if (Pin->LinkedTo.Num() == 0)
+		{
+			DestroyNode();
+			break;
+		}
+	}
+}
+
+void UEdNode_GenericGraphEdge::PostPlacedNewNode()
+{
+	CreateBoundGraph();
 }
 
 void UEdNode_GenericGraphEdge::DestroyNode()
@@ -60,7 +97,7 @@ void UEdNode_GenericGraphEdge::DestroyNode()
 	// BoundGraph may be shared with another graph, if so, don't remove it here
 	TObjectPtr<UEdGraph> GraphToRemove = GetBoundGraph();
 
-	BoundGraph = NULL;
+	BoundGraph = nullptr;
 	Super::DestroyNode();
 
 	// TODO: how to rewrite this to fit this plugin?
@@ -126,12 +163,20 @@ UEdNode_GenericGraphNode* UEdNode_GenericGraphEdge::GetEndNode()
 void UEdNode_GenericGraphEdge::CreateBoundGraph()
 {
 	// Create a new animation graph
-	check(BoundGraph == NULL);
+	check(BoundGraph == nullptr);
+
+	// old
 	//BoundGraph = FBlueprintEditorUtils::CreateNewGraph(this, NAME_None, UAnimationTransitionGraph::StaticClass(), UAnimationTransitionSchema::StaticClass());
+
+	// Construct a new graph
+	BoundGraph = NewObject<UEdGraph>(this, UEdGraph_GenericGraphEdge::StaticClass(), NAME_None, RF_Transactional);
+	BoundGraph->Schema = UEdGraphSchema_GenericGraphEdge::StaticClass();
+
 	check(BoundGraph);
 
 	// Find an interesting name
-	FEdGraphUtilities::RenameGraphToNameOrCloseToName(BoundGraph, TEXT("Transition"));
+	//FEdGraphUtilities::RenameGraphToNameOrCloseToName(BoundGraph, TEXT("Transition"));
+	BoundGraph->Rename(TEXT("Transition"), BoundGraph->GetOuter());
 
 	// Initialize the anim graph
 	const UEdGraphSchema* Schema = BoundGraph->GetSchema();
@@ -140,7 +185,7 @@ void UEdNode_GenericGraphEdge::CreateBoundGraph()
 	// Add the new graph as a child of our parent graph
 	UEdGraph* ParentGraph = GetGraph();
 
-	if(ParentGraph->SubGraphs.Find(BoundGraph) == INDEX_NONE)
+	if (ParentGraph->SubGraphs.Find(BoundGraph) == INDEX_NONE)
 	{
 		ParentGraph->SubGraphs.Add(BoundGraph);
 	}

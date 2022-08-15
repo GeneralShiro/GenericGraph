@@ -27,6 +27,7 @@ public class GenericGraphRuntime : ModuleRules
 				"Core",
 				"CoreUObject",
                 "Engine",
+				"UMG",
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

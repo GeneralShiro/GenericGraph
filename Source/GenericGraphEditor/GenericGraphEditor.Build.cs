@@ -19,6 +19,8 @@ public class GenericGraphEditor : ModuleRules
                 // ... add other private include paths required here ...
                 "GenericGraphEditor/Private",
 				"GenericGraphEditor/Public",
+                "GenericGraphEditor/Public/GenericGraphAssetEditor",
+                "GenericGraphEditor/Public/GenericGraphAssetEditor/EdgeGraph",
 			}
 			);
 
@@ -29,7 +31,6 @@ public class GenericGraphEditor : ModuleRules
 				"CoreUObject",
                 "Engine",
                 "UnrealEd",
-				"BlueprintGraph"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);

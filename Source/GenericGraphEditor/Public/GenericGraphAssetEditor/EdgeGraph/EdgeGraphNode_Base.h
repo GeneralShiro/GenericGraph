@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "K2Node.h"
 #include "EdgeGraphNode_Base.generated.h"
 
 /**
@@ -11,7 +10,7 @@
  * for an Edge node in a Generic Graph asset.
  */
 UCLASS()
-class GENERICGRAPHEDITOR_API UEdgeGraphNode_Base : public UK2Node
+class GENERICGRAPHEDITOR_API UEdgeGraphNode_Base : public UEdGraphNode
 {
 	GENERATED_BODY()
 	

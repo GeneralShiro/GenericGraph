@@ -39,6 +39,8 @@ public:
 	virtual FText GetNodeTitle(ENodeTitleType::Type TitleType) const override;
 	virtual void PinConnectionListChanged(UEdGraphPin* Pin) override;
 	virtual void PrepareForCopying() override;
+	virtual void PostPasteNode() override;
+	virtual void PostPlacedNewNode() override;
 	virtual void DestroyNode() override;
 	virtual UObject* GetJumpTargetForDoubleClick() const override;
 	virtual TArray<UEdGraph*> GetSubGraphs() const override;
